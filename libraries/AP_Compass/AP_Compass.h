@@ -35,9 +35,6 @@
 #endif
 #endif
 
-#ifndef COMPASS_CAL_ENABLED
-#define COMPASS_CAL_ENABLED 1
-#endif
 #ifndef COMPASS_MOT_ENABLED
 #define COMPASS_MOT_ENABLED 1
 #endif
@@ -196,7 +193,7 @@ public:
     /*
       handle an incoming MAG_CAL command
     */
-    MAV_RESULT handle_mag_cal_command(const mavlink_command_long_t &packet);
+    MAV_RESULT handle_mag_cal_command(const mavlink_command_int_t &packet);
 
     bool send_mag_cal_progress(const class GCS_MAVLINK& link);
     bool send_mag_cal_report(const class GCS_MAVLINK& link);
@@ -387,6 +384,10 @@ private:
     bool _add_backend(AP_Compass_Backend *backend);
     void _probe_external_i2c_compasses(void);
     void _detect_backends(void);
+    void probe_i2c_spi_compasses(void);
+#if AP_COMPASS_DRONECAN_ENABLED
+    void probe_dronecan_compasses(void);
+#endif
 
     // compass cal
     void _update_calibration_trampoline();
@@ -607,7 +608,9 @@ private:
     // bitmask of options
     enum class Option : uint16_t {
         CAL_REQUIRE_GPS = (1U<<0),
+        ALLOW_DRONECAN_AUTO_REPLACEMENT = (1U<<1),
     };
+    bool option_set(Option opt) const { return (_options.get() & uint16_t(opt)) != 0; }
     AP_Int16 _options;
 
 #if COMPASS_CAL_ENABLED
@@ -649,6 +652,8 @@ private:
     uint8_t msp_instance_mask;
 #endif
     bool init_done;
+
+    bool suppress_devid_save;
 
     uint8_t _first_usable; // first compass usable based on COMPASSx_USE param
 };

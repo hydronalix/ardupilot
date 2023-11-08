@@ -9,6 +9,7 @@
 
 -- set and get for field types share function names
 ---@diagnostic disable: duplicate-set-field
+---@diagnostic disable: missing-return
 
 -- manual bindings
 
@@ -44,6 +45,11 @@ function micros() end
 ---@return number|nil -- command param 4
 function mission_receive() end
 
+-- Print text, if MAVLink is available the value will be sent with debug severity
+-- If no MAVLink the value will be sent over can
+-- equivalent to gcs:send_text(7, text) or periph:can_printf(text)
+---@param text string|number|integer
+function print(text) end
 
 -- data flash logging to SD card
 ---@class logger
@@ -1527,6 +1533,29 @@ function MotorsMatrix:add_motor_raw(motor_num, roll_factor, pitch_factor, yaw_fa
 ---@return boolean
 function MotorsMatrix:init(expected_num_motors) end
 
+-- desc get index (starting at 0) of lost motor
+---@return integer
+function MotorsMatrix:get_lost_motor() end
+
+-- desc return true if we are in thrust boost due to possible lost motor
+---@return boolean
+function MotorsMatrix:get_thrust_boost() end
+
+
+-- Sub singleton
+---@class sub
+sub = {}
+
+-- Return true if joystick button is currently pressed
+---@param index integer
+---@return boolean
+function sub:is_button_pressed(index) end
+
+-- Get count of joystick button presses, then clear count
+---@param index integer
+---@return integer
+function sub:get_and_clear_button_count(index) end
+
 
 -- desc
 ---@class quadplane
@@ -1705,11 +1734,44 @@ function param:add_table(table_key, prefix, num_params) end
 function param:add_param(table_key, param_num, name, default_value) end
 
 -- desc
+---@class ESCTelemetryData_ud
+local ESCTelemetryData_ud = {}
+
+---@return ESCTelemetryData_ud
+function ESCTelemetryData() end
+
+-- set motor temperature
+---@param value integer
+function ESCTelemetryData_ud:motor_temp_cdeg(value) end
+
+-- set consumption
+---@param value number
+function ESCTelemetryData_ud:consumption_mah(value) end
+
+-- set current
+---@param value number
+function ESCTelemetryData_ud:current(value) end
+
+-- set voltage
+---@param value number
+function ESCTelemetryData_ud:voltage(value) end
+
+-- set temperature
+---@param value integer
+function ESCTelemetryData_ud:temperature_cdeg(value) end
+
+-- desc
 ---@class esc_telem
 esc_telem = {}
 
+-- update telemetry data for an ESC instance
+---@param instance integer -- 0 is first motor
+---@param telemdata ESCTelemetryData_ud
+---@param data_mask integer -- bit mask of what fields are filled in
+function esc_telem:update_telem_data(instance, telemdata, data_mask) end
+
 -- desc
----@param instance integer
+---@param param1 integer
 ---@return uint32_t_ud|nil
 function esc_telem:get_usage_seconds(instance) end
 
@@ -1944,6 +2006,11 @@ function serialLED:set_num_profiled(chan, num_leds) end
 ---@return boolean
 function serialLED:set_num_neopixel(chan, num_leds) end
 
+-- desc
+---@param chan integer
+---@param num_leds integer
+---@return boolean
+function serialLED:set_num_neopixel_rgb(chan, num_leds) end
 
 -- desc
 ---@class vehicle
@@ -1985,6 +2052,11 @@ function vehicle:get_wp_distance_m() end
 ---@param throttle number
 ---@return boolean
 function vehicle:set_steering_and_throttle(steering, throttle) end
+
+-- desc
+---@return number|nil
+---@return number|nil
+function vehicle:get_steering_and_throttle() end
 
 -- desc
 ---@param rate_dps number
@@ -2254,7 +2326,6 @@ function gcs:get_hud_throttle() end
 
 -- set high latency control state. Analogous to MAV_CMD_CONTROL_HIGH_LATENCY
 ---@param enabled boolean -- true to enable or false to disable
----@return void
 function gcs:enable_high_latency_connections(enabled) end
 
 -- get the the current state of high latency control
@@ -2273,6 +2344,10 @@ function gcs:get_high_latency_status() end
 ---| '7' # Debug: Useful non-operational messages that can assist in debugging. These should not occur during normal operation.
 ---@param text string
 function gcs:send_text(severity, text) end
+
+-- Return the system time when a gcs with id of SYSID_MYGCS was last seen
+---@return uint32_t_ud -- system time in milliseconds
+function gcs:last_seen() end
 
 -- desc
 ---@class relay
@@ -2410,10 +2485,46 @@ function rangefinder:has_orientation(orientation) end
 ---@return integer
 function rangefinder:num_sensors() end
 
+-- Proximity backend methods
+---@class AP_Proximity_Backend_ud
+local AP_Proximity_Backend_ud = {}
+
+-- Push virtual proximity boundary into actual boundary
+---@return boolean
+function AP_Proximity_Backend_ud:update_virtual_boundary() end
+
+-- Set sensor min and max. Only need to do it once
+---@param min number
+---@param max number
+---@return boolean
+function AP_Proximity_Backend_ud:set_distance_min_max(min, max) end
+
+-- type of backend
+---@return integer
+function AP_Proximity_Backend_ud:type() end
+
+-- send 3d object as 3d vector
+---@param vector_3d Vector3f_ud
+---@param update_boundary boolean
+---@return boolean
+function AP_Proximity_Backend_ud:handle_script_3d_msg(vector_3d, update_boundary) end
+
+-- send 3d object as angles
+---@param dist_m number
+---@param yaw_deg number
+---@param pitch_deg number
+---@param update_boundary boolean
+---@return boolean
+function AP_Proximity_Backend_ud:handle_script_distance_msg(dist_m, yaw_deg, pitch_deg, update_boundary) end
 
 -- desc
 ---@class proximity
 proximity = {}
+
+-- get backend based on proximity instance provided
+---@param instance integer
+---@return AP_Proximity_Backend_ud
+function proximity:get_backend(instance) end
 
 -- desc
 ---@param object_number integer
@@ -2644,6 +2755,12 @@ function battery:healthy(instance) end
 ---@return integer
 function battery:num_instances() end
 
+-- get individual cell voltage
+---@param instance integer
+---@param cell integer
+---@return number|nil
+function battery:get_cell_voltage(instance, cell) end
+
 
 -- desc
 ---@class arming
@@ -2828,6 +2945,23 @@ AC_AttitudeControl = {}
 function AC_AttitudeControl:get_rpy_srate() end
 
 -- desc
+---@class AR_AttitudeControl
+AR_AttitudeControl = {}
+
+-- return attitude controller slew rates for rovers
+---@return number -- steering slew rate
+---@return number -- spees slew rate
+function AR_AttitudeControl:get_srate() end
+
+-- desc
+---@class AR_PosControl
+AR_PosControl = {}
+
+-- return position controller slew rates for rovers
+---@return number -- velocity slew rate
+function AR_PosControl:get_srate() end
+
+-- desc
 ---@class follow
 follow = {}
 
@@ -2861,12 +2995,12 @@ scripting = {}
 function scripting:restart_all() end
 
 -- desc
---@param directoryname
---@return list of filenames
+---@param directoryname string
+---@return table -- table of filenames
 function dirlist(directoryname) end
 
 --desc
---@param filename
+---@param filename string
 function remove(filename) end
 
 -- desc
@@ -2874,23 +3008,43 @@ function remove(filename) end
 mavlink = {}
 
 -- initializes mavlink
---@param num_rx_msgid number
---@param msg_queue_length
+---@param num_rx_msgid uint32_t_ud|integer
+---@param msg_queue_length uint32_t_ud|integer
 function mavlink:init(num_rx_msgid, msg_queue_length) end
 
 -- marks mavlink message for receive, message id can be get using mavlink_msgs.get_msgid("MSG_NAME")
---@param msg_id number
+---@param msg_id number
 function mavlink:register_rx_msgid(msg_id) end
 
 -- receives mavlink message marked for receive using mavlink:register_rx_msgid
---@return mavlink_message bytes
---@return mavlink_channel number
---@return receive_timestamp number
+---@return string -- bytes
+---@return number -- mavlink channel
+---@return uint32_t_ud -- receive_timestamp
 function mavlink:receive_chan() end
 
 -- sends mavlink message, to use this function the call should be like this:
 -- mavlink:send(chan, mavlink_msgs.encode("MSG_NAME", {param1 = value1, param2 = value2, ...}})
---@param mavlink_channel integer
---@param mavlink_message_id integer
---@param encoded_message_packet bytes
+---@param chan integer
+---@param msgid integer
+---@param message string
 function mavlink:send_chan(chan, msgid, message) end
+
+-- Block a given MAV_CMD from being procceced by ArduPilot
+---@param comand_id integer
+function mavlink:block_command(comand_id) end
+
+-- Geofence library
+---@class fence
+fence = {}
+
+-- Returns the time at which the current breach started
+---@return uint32_t_ud system_time milliseconds
+function fence:get_breach_time() end
+
+-- Returns the type bitmask of any breached fences
+---@return integer fence_type bitmask
+---| 1 # Maximim altitude
+---| 2 # Circle
+---| 4 # Polygon
+---| 8 # Minimum altitude
+function fence:get_breaches() end

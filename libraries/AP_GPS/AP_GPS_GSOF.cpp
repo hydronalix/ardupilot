@@ -17,12 +17,18 @@
 //  Trimble GPS driver for ArduPilot.
 //  Code by Michael Oborne
 //
+//  Usage in SITL with hardware for debugging: 
+//    sim_vehicle.py -v Plane -A "--serial3=uart:/dev/ttyUSB0" --console --map -DG
+//    param set GPS_TYPE 11 // GSOF
+//    param set SERIAL3_PROTOCOL 5 // GPS
+//
 
 #define ALLOW_DOUBLE_MATH_FUNCTIONS
 
 #include "AP_GPS.h"
 #include "AP_GPS_GSOF.h"
 #include <AP_Logger/AP_Logger.h>
+#include <AP_HAL/utility/sparse-endian.h>
 
 #if AP_GPS_GSOF_ENABLED
 
@@ -69,8 +75,7 @@ AP_GPS_GSOF::read(void)
 
     if (gsofmsgreq_index < (sizeof(gsofmsgreq))) {
         if (now > gsofmsg_time) {
-            requestGSOF(gsofmsgreq[gsofmsgreq_index], 0);
-            requestGSOF(gsofmsgreq[gsofmsgreq_index], 3);
+            requestGSOF(gsofmsgreq[gsofmsgreq_index], HW_Port::COM2, Output_Rate::FREQ_10_HZ);
             gsofmsg_time = now + 110;
             gsofmsgreq_index++;
         }
@@ -166,16 +171,15 @@ AP_GPS_GSOF::requestBaud(const uint8_t portindex)
 }
 
 void
-AP_GPS_GSOF::requestGSOF(const uint8_t messagetype, const uint8_t portindex)
+AP_GPS_GSOF::requestGSOF(const uint8_t messageType, const HW_Port portIndex, const Output_Rate rateHz)
 {
     uint8_t buffer[21] = {0x02,0x00,0x64,0x0f,0x00,0x00,0x00, // application file record
                           0x03,0x00,0x01,0x00, // file control information block
-                          0x07,0x06,0x0a,portindex,0x01,0x00,0x01,0x00, // output message record
+                          0x07,0x06,0x0a,static_cast<uint8_t>(portIndex),static_cast<uint8_t>(rateHz),0x00,messageType,0x00, // output message record
                           0x00,0x03
                          }; // checksum
 
     buffer[4] = packetcount++;
-    buffer[17] = messagetype;
 
     uint8_t checksum = 0;
     for (uint8_t a = 1; a < (sizeof(buffer) - 1); a++) {
@@ -224,29 +228,17 @@ AP_GPS_GSOF::SwapFloat(const uint8_t* src, const uint32_t pos) const
 uint32_t
 AP_GPS_GSOF::SwapUint32(const uint8_t* src, const uint32_t pos) const
 {
-    union {
-        uint32_t u;
-        char bytes[sizeof(uint32_t)];
-    } uint32u;
-    uint32u.bytes[0] = src[pos + 3];
-    uint32u.bytes[1] = src[pos + 2];
-    uint32u.bytes[2] = src[pos + 1];
-    uint32u.bytes[3] = src[pos + 0];
-
-    return uint32u.u;
+    uint32_t u;
+    memcpy(&u, &src[pos], sizeof(u));
+    return be32toh(u);
 }
 
 uint16_t
 AP_GPS_GSOF::SwapUint16(const uint8_t* src, const uint32_t pos) const
 {
-    union {
-        uint16_t u;
-        char bytes[sizeof(uint16_t)];
-    } uint16u;
-    uint16u.bytes[0] = src[pos + 1];
-    uint16u.bytes[1] = src[pos + 0];
-
-    return uint16u.u;
+    uint16_t u;
+    memcpy(&u, &src[pos], sizeof(u));
+    return be16toh(u);
 }
 
 bool

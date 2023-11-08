@@ -334,6 +334,7 @@ local function sq(x)
    return x*x
 end
 
+local last_trick_action_state = nil
 if TRIK_ENABLE:get() > 0 then
 --[[
     // @Param: TRIK_SEL_FN
@@ -357,6 +358,8 @@ if TRIK_ENABLE:get() > 0 then
 --]]
    TRIK_COUNT  = bind_add_param2("_COUNT",  4, 3)
    TRICKS = {}
+
+   last_trick_action_state = rc:get_aux_cached(TRIK_ACT_FN:get())
 
    -- setup parameters for tricks
    local count = math.floor(constrain(TRIK_COUNT:get(),1,11))
@@ -2308,9 +2311,9 @@ local function mavlink_receiver()
       local msg,_,timestamp_ms = mavlink.receive_chan()
       if msg then
          local parsed_msg = mavlink_msgs.decode(msg, msg_map)
-         if parsed_msg.msgid == NAMED_VALUE_FLOAT_msgid then
+         if (parsed_msg ~= nil) and (parsed_msg.msgid == NAMED_VALUE_FLOAT_msgid) then
             -- convert remote timestamp to local timestamp with jitter correction
-            local time_boot_ms = jitter_correction.correct_offboard_timestamp_msec(parsed_msg.time_boot_ms, timestamp_ms)
+            local time_boot_ms = jitter_correction.correct_offboard_timestamp_msec(parsed_msg.time_boot_ms, timestamp_ms:toint())
             local value = parsed_msg.value
             local name = bytes_to_string(parsed_msg.name)
             return time_boot_ms, name, value, parsed_msg.sysid
@@ -2430,6 +2433,8 @@ function do_path()
       path_var.ss_angle = 0.0
       path_var.ss_angle_filt = 0.0
       path_var.last_rate_override = 0
+
+      path.highest_i = 0
 
       -- get initial tangent
       local p1, _ = rotate_path(path, path_var.path_t + 0.1/(path_var.total_time*LOOP_RATE),
@@ -3110,7 +3115,6 @@ function check_auto_mission()
    end
 end
 
-local last_trick_action_state = rc:get_aux_cached(TRIK_ACT_FN:get())
 local trick_sel_chan = nil
 local last_trick_selection = nil
 

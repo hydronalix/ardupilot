@@ -1,4 +1,5 @@
 #include "Sub.h"
+#include "mode.h"
 
 // Functions that will handle joystick/gamepad input
 // ----------------------------------------------------------------------------
@@ -34,7 +35,7 @@ void Sub::init_joystick()
     lights1 = RC_Channels::rc_channel(8)->get_radio_min();
     lights2 = RC_Channels::rc_channel(9)->get_radio_min();
 
-    set_mode(MANUAL, ModeReason::RC_COMMAND); // Initialize flight mode
+    set_mode(Mode::Number::MANUAL, ModeReason::RC_COMMAND); // Initialize flight mode
 
     if (g.numGainSettings < 1) {
         g.numGainSettings.set_and_save(1);
@@ -157,28 +158,28 @@ void Sub::handle_jsbutton_press(uint8_t _button, bool shift, bool held)
         break;
 
     case JSButton::button_function_t::k_mode_manual:
-        set_mode(MANUAL, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::MANUAL, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_stabilize:
-        set_mode(STABILIZE, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::STABILIZE, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_depth_hold:
-        set_mode(ALT_HOLD, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::ALT_HOLD, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_auto:
-        set_mode(AUTO, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::AUTO, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_guided:
-        set_mode(GUIDED, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::GUIDED, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_circle:
-        set_mode(CIRCLE, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::CIRCLE, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_acro:
-        set_mode(ACRO, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::ACRO, ModeReason::RC_COMMAND);
         break;
     case JSButton::button_function_t::k_mode_poshold:
-        set_mode(POSHOLD, ModeReason::RC_COMMAND);
+        set_mode(Mode::Number::POSHOLD, ModeReason::RC_COMMAND);
         break;
 
     case JSButton::button_function_t::k_mount_center:
@@ -592,6 +593,21 @@ void Sub::handle_jsbutton_press(uint8_t _button, bool shift, bool held)
     case JSButton::button_function_t::k_custom_6:
         // Not implemented
         break;
+
+#if AP_SCRIPTING_ENABLED
+    case JSButton::button_function_t::k_script_1:
+        sub.script_buttons[0].press();
+        break;
+    case JSButton::button_function_t::k_script_2:
+        sub.script_buttons[1].press();
+        break;
+    case JSButton::button_function_t::k_script_3:
+        sub.script_buttons[2].press();
+        break;
+    case JSButton::button_function_t::k_script_4:
+        sub.script_buttons[3].press();
+        break;
+#endif // AP_SCRIPTING_ENABLED
     }
 }
 
@@ -636,6 +652,21 @@ void Sub::handle_jsbutton_release(uint8_t _button, bool shift) {
     }
         break;
 #endif
+
+#if AP_SCRIPTING_ENABLED
+    case JSButton::button_function_t::k_script_1:
+        sub.script_buttons[0].release();
+        break;
+    case JSButton::button_function_t::k_script_2:
+        sub.script_buttons[1].release();
+        break;
+    case JSButton::button_function_t::k_script_3:
+        sub.script_buttons[2].release();
+        break;
+    case JSButton::button_function_t::k_script_4:
+        sub.script_buttons[3].release();
+        break;
+#endif // AP_SCRIPTING_ENABLED
     }
 }
 
@@ -729,3 +760,15 @@ void Sub::clear_input_hold()
     zTrim = 0;
     input_hold_engaged = false;
 }
+
+#if AP_SCRIPTING_ENABLED
+bool Sub::is_button_pressed(uint8_t index)
+{
+    return script_buttons[index - 1].is_pressed();
+}
+
+uint8_t Sub::get_and_clear_button_count(uint8_t index)
+{
+    return script_buttons[index - 1].get_and_clear_count();
+}
+#endif // AP_SCRIPTING_ENABLED

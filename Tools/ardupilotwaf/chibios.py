@@ -31,7 +31,7 @@ def _load_dynamic_env_data(bld):
             # relative paths from the make build are relative to BUILDROOT
             d = os.path.join(bld.env.BUILDROOT, d)
         d = os.path.normpath(d)
-        if not d in idirs2:
+        if d not in idirs2:
             idirs2.append(d)
     _dynamic_env_data['include_dirs'] = idirs2
 
@@ -98,7 +98,7 @@ class upload_fw(Task.Task):
         except subprocess.CalledProcessError:
             #if where.exe can't find the file it returns a non-zero result which throws this exception
             where_python = ""
-        if not where_python or not "\Python\Python" in where_python or "python.exe" not in where_python:
+        if not where_python or "\Python\Python" not in where_python or "python.exe" not in where_python:
             print(self.get_full_wsl2_error_msg("Windows python.exe not found"))
             return False
         return True
@@ -578,6 +578,8 @@ def configure(cfg):
     load_env_vars(cfg.env)
     if env.HAL_NUM_CAN_IFACES and not env.AP_PERIPH:
         setup_canmgr_build(cfg)
+    if env.HAL_NUM_CAN_IFACES and env.AP_PERIPH and int(env.HAL_NUM_CAN_IFACES)>1 and not env.BOOTLOADER:
+        env.DEFINES += [ 'CANARD_MULTI_IFACE=1' ]
     setup_optimization(cfg.env)
 
 def generate_hwdef_h(env):
@@ -717,6 +719,7 @@ def build(bld):
                 'fopen', 'fflush', 'fwrite', 'fread', 'fputs', 'fgets',
                 'clearerr', 'fseek', 'ferror', 'fclose', 'tmpfile', 'getc', 'ungetc', 'feof',
                 'ftell', 'freopen', 'remove', 'vfprintf', 'fscanf',
-                '_gettimeofday', '_times', '_times_r', '_gettimeofday_r', 'time', 'clock' ]
+                '_gettimeofday', '_times', '_times_r', '_gettimeofday_r', 'time', 'clock',
+                '_sbrk', '_sbrk_r', '_malloc_r', '_calloc_r', '_free_r']
     for w in wraplist:
         bld.env.LINKFLAGS += ['-Wl,--wrap,%s' % w]
